@@ -1,0 +1,178 @@
+---
+title: "Skyhawk Therapeutics"
+author: "Sanjana Gorlla"
+output:
+  html_document: default
+  pdf_document: default
+date: "2022-09-26"
+---
+
+
+##### Objective
+
+*Compare differentially expressed genes from two experiments & assess if the perturbations in the experiments may act in similar pathways*
+
+```{r}
+# loading the required packages
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(tidyverse)
+```
+
+#### Tasks & Conclusion
+
+  *Download the differential expression analysis results from two studies in the EBI expression atlas*
+  
+  *In the first study, cells were treated with a drug, nutlin which activates the P53 pathway*
+  
+  *In the second study, the spliceosome gene PRPF8 was silenced with RNAi*
+  
+  *Filter the results to only significant changes using the typical cutoffs of pval < 0.05 and abs(log2fc) > 1* 
+  
+  *Merge the results & prepare a scatter-plot to compare log2 fold-change observed in each gene btwn the experiments*
+
+  *comment on whether these results lead you to think that nutlin is acting on the same pathway as PRPF8 and why*
+
+
+
+
+
+
+
+#### Approach 
+
+1. Downloaded  the differential expression analysis results from two studies in the EBI expression atlas following the links : 
+      (i). *https://www.ebi.ac.uk/gxa/experiments/E-GEOD-53965*
+      (ii). *https://www.ebi.ac.uk/gxa/experiments/E-MTAB-3021/Results*
+2. Filtering based on condition:   
+      - read.table() - load differential expression analysis results
+      - subset() - gene id, gene name, log2 fold changes and p-values
+      - Indexing + condtion - filtering 
+3. Merging the results from two experiments:
+      - merge() - merged both the experiments based on columns
+4. Visualizing & comparing:
+      - ggplot() + geom_point - scatterplot of log2fc of nutlin and PRPF8
+5. Analyzing the graph and interpretation
+
+
+
+
+
+**Experiment 1**
+- read.table() - load differential expression analysis results
+- subset() - gene id, gene name, log2 fold changes and p-values
+- Indexing + condtion - filtering 
+```{r}
+# loading the experiment1 dataset
+exp1<- read.table(file = "/Users/sanjanagorlla/Desktop/skyhawk/E-GEOD-53965-A-AFFY-141-query-results (1).tsv",
+                  sep = '\t', header = TRUE)
+
+# Extract gene id, gene name, log2 fold changes and p-values of exp1  using subset()
+exp1_filter<-subset(exp1, select = c("Gene.ID", "Gene.Name",
+                                     "X10.micromolar..Nutlin.3.vs.DMSO.control.foldChange",
+                                     "X10.micromolar..Nutlin.3.vs.DMSO.control.pValue"))
+
+
+# Renaming column names
+
+colnames(exp1_filter) <- c("Gene.ID", "Gene.Name","log2fc","pval" )
+
+# Filter the results to only significant changes 
+# using the typical cutoffs of pval < 0.05 and abs(log2fc) > 1
+# keep rows with p-value<0.05  & |log2FoldChange|>1
+exp1_df<- data.frame(exp1_filter[exp1_filter$pval<0.05 &
+                                   abs(exp1_filter$log2fc)>1,])
+
+#rank tables high to low log2FoldChange_abs
+exp1_final <- exp1_df %>%
+  as.data.frame() %>%
+  dplyr::arrange(dplyr::desc(log2fc))
+
+# Top 10 genes
+head(exp1_final, 10)
+```
+
+
+
+**Experiment 2** 
+```{r}
+# loading the experiment2 dataset
+exp2<- read.table(file = "/Users/sanjanagorlla/Desktop/skyhawk/E-MTAB-3021-query-results.tsv", 
+                  sep = '\t', header = TRUE)
+
+#Extract gene id, gene name, log2 fold changes and p-values of exp1  using subset()
+exp2_filter <-subset(exp2, select = c("Gene.ID", "Gene.Name", 
+                                      "PRPF8.vs.control..foldChange", 
+                                      "PRPF8.vs.control.pValue"))
+
+# Renaming column names
+colnames(exp2_filter) <- c("Gene.ID", "Gene.Name","log2fc","pval" )
+
+# Filter the results to only significant changes 
+# using the typical cutoffs of pval < 0.05 and abs(log2fc) > 1
+# keep rows with p-value<0.05  & |log2FoldChange|>1
+exp2_df<- data.frame(exp2_filter[exp2_filter$pval<0.05 &
+                                   abs(exp2_filter$log2fc)>1,])
+
+#rank tables high to low log2FoldChange_abs
+exp2_final <- exp2_df %>%
+  as.data.frame() %>%
+  dplyr::arrange(dplyr::desc(log2fc))
+
+# Top 10 genes
+head(exp2_final, 10)
+```
+
+
+
+```{r}
+# sub-setting only geneID, genename and log2foldchange for further analysis
+exp1df<-as.data.frame(subset(exp1_final, select = c("Gene.ID", "Gene.Name","log2fc")))
+exp2df<-as.data.frame(subset(exp2_final, select = c("Gene.ID", "Gene.Name","log2fc")))
+```
+
+
+**Merging the results**
+```{r}
+# Merging the results from both the experiments based on common genes
+merge_df12 <- merge(exp1df, exp2df, by=c("Gene.ID", "Gene.Name")) 
+merge_df12
+```
+
+
+```{r}
+# Final data for analysis
+log2fc <- c(merge_df12$log2fc.x, merge_df12$log2fc.y)
+Gene.ID <- c(merge_df12$Gene.ID, merge_df12$Gene.ID)
+final_data <- data.frame(Gene.ID, log2fc) 
+final_data$Source <- c(replicate(74,"NUTLIN"),replicate(74,"PRPF8"))
+```
+
+
+**Scatterplot for comparision**
+```{r}
+#scatter-plot to compare log2 fold-change observed in each gene between the experiments
+ggplot(final_data, aes(x=Gene.ID, y= log2fc, color=Source))+
+  geom_point(alpha = 0.5) + theme(axis.text.x = element_text(angle = 90, hjust = 3)) +
+  ggtitle("Log2 fold-change in each gene between Nutlin and PRPF8")
+```
+
+
+
+**Scatterplot for comparision**
+
+1. **Cells were treated with a drug, nutlin which activates the P53 pathway**: The connection between MDM2 and p53 is competitively blocked by nutlin-3, which stops p53 from being ubiquitinated and degraded. In numerous model systems, nutlin-3 treatment has been demonstrated to restore p53 activation and the concomitant production of apoptosis, senescence, or reversible cell cycle arrest.
+
+2. **The spliceosome gene PRPF8 was silenced with RNAi** : Alterations in RNA splicing patterns across the human transcriptome that occur in conditions of restricted cellular PRPF8 abundance are defined by the altered splicing of introns with weak 5' splice sites.
+
+**Scatterplot** : By comparing the genes regulated by both the pathways : we can observe that the genes expressed in P53 pathway due to Nutlin acts very similar to the PRPF8 pathway and is evident with the scatter-plot.
+
+Except the genes PLK3 & KIF24 treated with Nutlin have negative log2fc values which means that the gene is less expressed with nutlin.
+
+All the majority of genes have values >1 which are highly expressed. 
+
+Therefore, there is a high possibility that both the experimental perturbations act along similar pathways.
+
+Based on the genes compared nutlin is acting on the same pathway as PRPF8
+
